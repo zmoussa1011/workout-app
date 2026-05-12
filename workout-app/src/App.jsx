@@ -26,6 +26,27 @@ function parseRest(s) {
   return parseInt(s);
 }
 
+function parseSets(s) {
+  const m=s.match(/(\d+)\s*[×x]\s*(\d+)(?:[-–](\d+))?/);
+  if(!m) return {sets:3,repsMin:10,repsMax:12};
+  return {sets:parseInt(m[1]),repsMin:parseInt(m[2]),repsMax:parseInt(m[3]||m[2])};
+}
+
+function suggestExWeight(prevWkData,sid,exName,setsStr){
+  const prev=prevWkData?.[sid];
+  const prevWeight=prev?.weights?.[exName];
+  const prevReps=prev?.repsLog?.[exName];
+  if(!prevWeight||!prevReps) return null;
+  const {sets,repsMin,repsMax}=parseSets(setsStr);
+  const rel=prevReps.slice(0,sets).map(Number);
+  const allHit=rel.every(r=>r>=repsMin);
+  if(allHit) return {weight:String(Number(prevWeight)+5),allHit:true,prevWeight};
+  const entered=rel.filter(r=>r>0);
+  if(!entered.length) return null;
+  const suggestedReps=Math.min(Math.min(...entered)+1,repsMax);
+  return {weight:prevWeight,allHit:false,prevWeight,suggestedReps};
+}
+
 function suggestLevels(pr){
   if(!pr) return null;
   return HIIT_BASE.map((_,i)=>{
@@ -223,6 +244,7 @@ export default function App(){
   const setDay=(sid,v)=>upd(d=>{d[wKey]={...(d[wKey]||{}),[sid]:{...(d[wKey]?.[sid]||{}),day:v}};});
   const setLog=(sid,fid,v)=>upd(d=>{const s=d[wKey]?.[sid]||{};d[wKey]={...(d[wKey]||{}),[sid]:{...s,log:{...(s.log||{}),[fid]:v}}};});
   const setWt=(sid,ex,wi,v)=>upd(d=>{const k=`w${wi+1}`,s=d[k]?.[sid]||{};d[k]={...(d[k]||{}),[sid]:{...s,weights:{...(s.weights||{}),[ex]:v}}};});
+  const setRepsLog=(sid,ex,setIdx,v)=>upd(d=>{const s=d[wKey]?.[sid]||{};const prev=s.repsLog?.[ex]||[];const next=[...prev];next[setIdx]=v;d[wKey]={...(d[wKey]||{}),[sid]:{...s,repsLog:{...(s.repsLog||{}),[ex]:next}}};});
   const toggleDay=(pfx,id)=>upd(d=>{const dd=d[dKey]||{};d[dKey]={...dd,[`${pfx}_${id}`]:!dd[`${pfx}_${id}`]};});
   const setHiitRound=(idx,field,val)=>upd(d=>{
     const dd=d[dKey]||{};
@@ -449,6 +471,10 @@ export default function App(){
                       <div style={{...slbl,marginTop:12}}>EXERCISES — tap to log weight</div>
                       {s.exercises.map(ex=>{
                         const ek=`${s.id}_${ex.name}`,exOpen=openEx===ek,curWt=(sd.weights||{})[ex.name]||"";
+                        const curRepsLog=(sd.repsLog||{})[ex.name]||[];
+                        const prevWkData=data[`w${week-1}`]||{};
+                        const suggestion=week>1?suggestExWeight(prevWkData,s.id,ex.name,ex.sets):null;
+                        const {sets,repsMin,repsMax}=parseSets(ex.sets);
                         return(
                           <div key={ex.name} style={{marginBottom:5}}>
                             <button onClick={()=>setOpenEx(exOpen?null:ek)} style={{width:"100%",background:C.bg,border:`1px solid ${C.border2}`,borderRadius:9,padding:"9px 12px",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
@@ -462,8 +488,29 @@ export default function App(){
                             {exOpen&&(
                               <div style={{padding:"10px 12px",background:"#faf0e4",borderRadius:"0 0 9px 9px",border:`1px solid ${C.border2}`,borderTop:"none"}}>
                                 <div style={{fontSize:11,color:C.muted,lineHeight:1.6,marginBottom:8,padding:"7px 9px",background:`${s.color}08`,borderRadius:6,border:`1px solid ${s.color}15`}}>💡 {ex.note}</div>
+                                {suggestion&&(
+                                  <div style={{fontSize:10,padding:"6px 9px",borderRadius:7,marginBottom:10,background:suggestion.allHit?`${s.color}0d`:"rgba(184,137,42,0.08)",color:suggestion.allHit?s.color:C.yellow,border:`1px solid ${suggestion.allHit?s.color+"25":"rgba(184,137,42,0.25)"}`}}>
+                                    {suggestion.allHit?`💪 Hit all reps at ${suggestion.prevWeight} lbs — try ${suggestion.weight} lbs`:`🎯 Stay at ${suggestion.weight} lbs — aim for ${suggestion.suggestedReps} reps per set`}
+                                  </div>
+                                )}
                                 <label style={{fontSize:10,color:C.gray,display:"block",marginBottom:4}}>Weight used (lbs)</label>
                                 <input type="number" placeholder="0" value={curWt} onChange={e=>setWt(s.id,ex.name,week-1,e.target.value)} style={{...iSty,width:130}}/>
+                                <div style={{marginTop:10}}>
+                                  <div style={{fontSize:9,color:C.dim,fontWeight:700,letterSpacing:"0.06em",marginBottom:5}}>REPS PER SET <span style={{color:C.gray,fontWeight:400,letterSpacing:0}}>— target: {repsMin}{repsMax!==repsMin?`–${repsMax}`:""}</span></div>
+                                  <div style={{display:"flex",gap:5}}>
+                                    {Array.from({length:sets},(_,i)=>{
+                                      const val=curRepsLog[i]||"";
+                                      const hit=val&&Number(val)>=repsMin;
+                                      return(
+                                        <div key={i} style={{flex:1,textAlign:"center"}}>
+                                          <div style={{fontSize:8,color:C.dim,marginBottom:2}}>S{i+1}</div>
+                                          <input type="number" placeholder={String(repsMin)} value={val} onChange={e=>setRepsLog(s.id,ex.name,i,e.target.value)}
+                                            style={{...iSty,padding:"5px 2px",fontSize:11,textAlign:"center",color:hit?C.green:C.text,borderColor:hit?C.green+"60":C.border,fontWeight:hit?700:400}}/>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
                               </div>
                             )}
                           </div>
@@ -503,6 +550,7 @@ export default function App(){
                             <input type="number" placeholder="—" value={val} onChange={e=>setWt(s.id,ex.name,i,e.target.value)}
                               style={{width:"100%",textAlign:"center",outline:"none",borderRadius:6,padding:"4px 1px",fontSize:11,fontWeight:val?700:400,background:val?`${s.color}14`:C.bg,border:`1px solid ${val?s.color+"40":C.border2}`,color:val?s.color:C.dim}}/>
                             {val&&i>0&&allW[i-1]&&<div style={{fontSize:8,marginTop:2,fontWeight:700,color:Number(val)>=Number(allW[i-1])?C.green:C.red}}>{Number(val)>=Number(allW[i-1])?"▲":"▼"}{Math.abs(Number(val)-Number(allW[i-1]))}</div>}
+                            {val&&(()=>{const log=(data[`w${i+1}`]?.[s.id]?.repsLog||{})[ex.name]||[];const{sets:ns,repsMin:rm}=parseSets(ex.sets);const partial=log.some(r=>Number(r)>0);const allHit=partial&&log.slice(0,ns).every(r=>Number(r)>=rm);return partial?<div style={{fontSize:7,marginTop:2,color:allHit?C.green:C.yellow,fontWeight:700}}>{allHit?"✓ all reps":"⚡ partial"}</div>:null;})()}
                           </div>
                         ))}
                       </div>
