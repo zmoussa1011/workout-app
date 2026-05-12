@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 
 const C = {
   bg:"#fdf6ee",card:"#ffffff",border:"#e8d5c0",border2:"#f0e4d4",
@@ -142,6 +142,8 @@ export default function App(){
   const [openEx,setOpenEx]=useState(null);
   const [planSub,setPlanSub]=useState("split");
   const [timer,setTimer]=useState({active:false,seconds:0,roundIdx:null});
+  const [importMsg,setImportMsg]=useState(null);
+  const importRef=useRef();
   const TOTAL=6;
 
   // Persist data
@@ -170,6 +172,25 @@ export default function App(){
     const secs=parseRest(restStr);
     if(!secs) return;
     setTimer({active:true,seconds:secs,roundIdx:idx});
+  };
+
+  const importData=(e)=>{
+    const file=e.target.files?.[0]; if(!file) return;
+    const reader=new FileReader();
+    reader.onload=(ev)=>{
+      try{
+        const parsed=JSON.parse(ev.target.result);
+        if(parsed.data) setData(parsed.data);
+        if(parsed.startDate) setStartDate(parsed.startDate);
+        setImportMsg("✓ Data restored successfully");
+        setTimeout(()=>setImportMsg(null),3000);
+      } catch {
+        setImportMsg("✗ Invalid backup file");
+        setTimeout(()=>setImportMsg(null),3000);
+      }
+    };
+    reader.readAsText(file);
+    e.target.value="";
   };
 
   const exportData=()=>{
@@ -225,7 +246,7 @@ export default function App(){
     <div style={{background:C.bg,minHeight:"100vh",fontFamily:"'DM Sans',system-ui,sans-serif",color:C.text,fontSize:13}}>
 
       {/* HEADER */}
-      <div style={{position:"sticky",top:0,zIndex:100,background:`linear-gradient(180deg,#f5e6d2,${C.bg})`,padding:"14px 14px 0",borderBottom:`1px solid ${C.border2}`}}>
+      <div style={{position:"sticky",top:0,zIndex:100,background:`linear-gradient(180deg,#f5e6d2,${C.bg})`,padding:"14px 14px 0",paddingTop:"calc(14px + env(safe-area-inset-top, 0px))",borderBottom:`1px solid ${C.border2}`}}>
         <div style={{maxWidth:680,margin:"0 auto"}}>
           <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
             <div>
@@ -291,7 +312,7 @@ export default function App(){
         </div>
       </div>
 
-      <div style={{maxWidth:680,margin:"0 auto",padding:14,paddingBottom:40}}>
+      <div style={{maxWidth:680,margin:"0 auto",padding:14,paddingBottom:"calc(40px + env(safe-area-inset-bottom, 0px))"}}>
 
         {/* ══ TRACKER ══ */}
         {tab==="tracker"&&(
@@ -490,10 +511,15 @@ export default function App(){
                 })}
               </div>
             ))}
+            {importMsg&&(
+              <div style={{textAlign:"center",padding:"8px 12px",borderRadius:9,marginBottom:8,fontSize:12,fontWeight:600,background:importMsg.startsWith("✓")?"rgba(78,140,69,0.1)":"rgba(200,101,62,0.1)",color:importMsg.startsWith("✓")?C.green:C.red,border:`1px solid ${importMsg.startsWith("✓")?C.green+"40":C.red+"40"}`}}>{importMsg}</div>
+            )}
             <div style={{display:"flex",gap:8}}>
-              <button onClick={()=>{if(window.confirm(`Reset Week ${week}?`))upd(d=>{delete d[wKey];})}} style={{flex:1,background:"none",border:`1px solid ${C.border}`,borderRadius:9,padding:"10px 0",color:C.dim,fontSize:12,cursor:"pointer"}}>Reset Week {week} Data</button>
-              <button onClick={exportData} style={{flex:1,background:"rgba(96,165,250,0.07)",border:`1px solid rgba(96,165,250,0.25)`,borderRadius:9,padding:"10px 0",color:C.blue,fontSize:12,cursor:"pointer",fontWeight:600}}>⬇ Export Backup</button>
+              <button onClick={()=>{if(window.confirm(`Reset Week ${week}?`))upd(d=>{delete d[wKey];})}} style={{flex:1,background:"none",border:`1px solid ${C.border}`,borderRadius:9,padding:"10px 0",color:C.dim,fontSize:12,cursor:"pointer"}}>Reset Week {week}</button>
+              <button onClick={()=>importRef.current.click()} style={{flex:1,background:"rgba(78,140,69,0.07)",border:`1px solid rgba(78,140,69,0.25)`,borderRadius:9,padding:"10px 0",color:C.green,fontSize:12,cursor:"pointer",fontWeight:600}}>⬆ Import</button>
+              <button onClick={exportData} style={{flex:1,background:"rgba(61,126,146,0.07)",border:`1px solid rgba(61,126,146,0.25)`,borderRadius:9,padding:"10px 0",color:C.blue,fontSize:12,cursor:"pointer",fontWeight:600}}>⬇ Export</button>
             </div>
+            <input ref={importRef} type="file" accept=".json" onChange={importData} style={{display:"none"}}/>
           </div>
         )}
 
