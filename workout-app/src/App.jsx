@@ -1,10 +1,10 @@
 import { useState, useEffect } from "react";
 
 const C = {
-  bg:"#1a1209",card:"#241a0f",border:"#3d2e1e",border2:"#2e2013",
-  dim:"#7a6248",gray:"#9e8265",muted:"#c4a882",light:"#e0cdb5",
-  text:"#f0e6d3",white:"#f5ede0",green:"#7fb069",blue:"#6b9fad",
-  purple:"#b8869e",yellow:"#c9a84c",red:"#e8956d",orange:"#d4845a",
+  bg:"#fdf6ee",card:"#ffffff",border:"#e8d5c0",border2:"#f0e4d4",
+  dim:"#a8896e",gray:"#7a6048",muted:"#5c4433",light:"#3d2a1a",
+  text:"#2d1a0e",white:"#1a0f06",green:"#4e8c45",blue:"#3d7e92",
+  purple:"#9e6b7e",yellow:"#b8892a",red:"#c8653e",orange:"#be5f32",
 };
 const iSty={width:"100%",background:C.bg,border:`1px solid ${C.border}`,borderRadius:8,padding:"8px 11px",fontSize:13,color:C.text,outline:"none",fontFamily:"inherit"};
 const slbl={fontSize:10,fontWeight:700,color:C.dim,letterSpacing:"0.07em",marginBottom:8};
@@ -108,8 +108,8 @@ const currentWeekDays = () => {
 };
 
 function Tick({checked,color}){
-  return <div style={{width:24,height:24,borderRadius:7,flexShrink:0,pointerEvents:"none",border:`2px solid ${checked?color:"#2d3748"}`,background:checked?color:"transparent",display:"flex",alignItems:"center",justifyContent:"center",transition:"all 0.15s"}}>
-    {checked&&<svg width="13" height="13" viewBox="0 0 13 13"><path d="M2 6.5l3.5 3.5 5.5-6" stroke="#0d1117" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" fill="none"/></svg>}
+  return <div style={{width:24,height:24,borderRadius:7,flexShrink:0,pointerEvents:"none",border:`2px solid ${checked?color:"#d0b8a0"}`,background:checked?color:"transparent",display:"flex",alignItems:"center",justifyContent:"center",transition:"all 0.15s"}}>
+    {checked&&<svg width="13" height="13" viewBox="0 0 13 13"><path d="M2 6.5l3.5 3.5 5.5-6" stroke="#ffffff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" fill="none"/></svg>}
   </div>;
 }
 function Badge({children,color}){return <span style={{padding:"2px 7px",borderRadius:4,fontSize:10,fontWeight:700,background:`${color}1a`,color,border:`1px solid ${color}30`}}>{children}</span>;}
@@ -225,7 +225,7 @@ export default function App(){
     <div style={{background:C.bg,minHeight:"100vh",fontFamily:"'DM Sans',system-ui,sans-serif",color:C.text,fontSize:13}}>
 
       {/* HEADER */}
-      <div style={{position:"sticky",top:0,zIndex:100,background:`linear-gradient(180deg,#120d06,${C.bg})`,padding:"14px 14px 0",borderBottom:`1px solid ${C.border2}`}}>
+      <div style={{position:"sticky",top:0,zIndex:100,background:`linear-gradient(180deg,#f5e6d2,${C.bg})`,padding:"14px 14px 0",borderBottom:`1px solid ${C.border2}`}}>
         <div style={{maxWidth:680,margin:"0 auto"}}>
           <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
             <div>
@@ -336,11 +336,11 @@ export default function App(){
                   {/* HIIT rounds */}
                   {s.id==="hiit"&&(
                     <div>
-                      {suggestions&&<div style={{fontSize:10,color:C.yellow,background:"rgba(251,191,36,0.08)",border:"1px solid rgba(251,191,36,0.2)",borderRadius:7,padding:"7px 10px",marginBottom:10}}>💡 Levels suggested from yesterday — adjust as you feel</div>}
+                      {suggestions&&<div style={{fontSize:10,color:C.yellow,background:"rgba(184,137,42,0.08)",border:"1px solid rgba(184,137,42,0.25)",borderRadius:7,padding:"7px 10px",marginBottom:10}}>💡 Levels suggested from yesterday — adjust as you feel</div>}
 
                       {/* Active rest timer banner */}
                       {timer.active&&(
-                        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",background:"rgba(248,113,113,0.1)",border:"1px solid rgba(248,113,113,0.3)",borderRadius:9,padding:"10px 14px",marginBottom:10}}>
+                        <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",background:"rgba(200,101,62,0.08)",border:"1px solid rgba(200,101,62,0.25)",borderRadius:9,padding:"10px 14px",marginBottom:10}}>
                           <div>
                             <div style={{fontSize:10,color:C.dim,fontWeight:700,marginBottom:2}}>REST — Round {(timer.roundIdx??0)+1}</div>
                             <div style={{fontSize:28,fontWeight:800,color:timer.seconds<=10?C.red:C.text,fontVariantNumeric:"tabular-nums",lineHeight:1}}>
@@ -439,7 +439,7 @@ export default function App(){
                               </div>
                             </button>
                             {exOpen&&(
-                              <div style={{padding:"10px 12px",background:"#0a0f1a",borderRadius:"0 0 9px 9px",border:`1px solid ${C.border2}`,borderTop:"none"}}>
+                              <div style={{padding:"10px 12px",background:"#faf0e4",borderRadius:"0 0 9px 9px",border:`1px solid ${C.border2}`,borderTop:"none"}}>
                                 <div style={{fontSize:11,color:C.muted,lineHeight:1.6,marginBottom:8,padding:"7px 9px",background:`${s.color}08`,borderRadius:6,border:`1px solid ${s.color}15`}}>💡 {ex.note}</div>
                                 <label style={{fontSize:10,color:C.gray,display:"block",marginBottom:4}}>Weight used (lbs)</label>
                                 <input type="number" placeholder="0" value={curWt} onChange={e=>setWt(s.id,ex.name,week-1,e.target.value)} style={{...iSty,width:130}}/>
@@ -491,7 +491,7 @@ export default function App(){
               </div>
             ))}
             <div style={{display:"flex",gap:8}}>
-              <button onClick={()=>{if(window.confirm(`Reset Week ${week}?`))upd(d=>{delete d[wKey];})}} style={{flex:1,background:"none",border:`1px solid #2d3748`,borderRadius:9,padding:"10px 0",color:C.dim,fontSize:12,cursor:"pointer"}}>Reset Week {week} Data</button>
+              <button onClick={()=>{if(window.confirm(`Reset Week ${week}?`))upd(d=>{delete d[wKey];})}} style={{flex:1,background:"none",border:`1px solid ${C.border}`,borderRadius:9,padding:"10px 0",color:C.dim,fontSize:12,cursor:"pointer"}}>Reset Week {week} Data</button>
               <button onClick={exportData} style={{flex:1,background:"rgba(96,165,250,0.07)",border:`1px solid rgba(96,165,250,0.25)`,borderRadius:9,padding:"10px 0",color:C.blue,fontSize:12,cursor:"pointer",fontWeight:600}}>⬇ Export Backup</button>
             </div>
           </div>
@@ -540,7 +540,7 @@ export default function App(){
                 );
               })}
             </Card>
-            <button onClick={()=>{if(window.confirm("Reset today?"))upd(d=>{delete d[dKey];});}} style={{width:"100%",background:"none",border:`1px solid #2d3748`,borderRadius:9,padding:"10px 0",color:C.dim,fontSize:12,cursor:"pointer"}}>Reset Today's Checklist</button>
+            <button onClick={()=>{if(window.confirm("Reset today?"))upd(d=>{delete d[dKey];});}} style={{width:"100%",background:"none",border:`1px solid ${C.border}`,borderRadius:9,padding:"10px 0",color:C.dim,fontSize:12,cursor:"pointer"}}>Reset Today's Checklist</button>
           </div>
         )}
 
@@ -548,7 +548,7 @@ export default function App(){
         {tab==="macros"&&(
           <div>
             {/* Instructions */}
-            <div style={{background:"rgba(96,165,250,0.06)",border:`1px solid rgba(96,165,250,0.2)`,borderRadius:10,padding:"11px 13px",marginBottom:14,fontSize:11,color:C.muted,lineHeight:1.6}}>
+            <div style={{background:"rgba(61,126,146,0.06)",border:`1px solid rgba(61,126,146,0.2)`,borderRadius:10,padding:"11px 13px",marginBottom:14,fontSize:11,color:C.muted,lineHeight:1.6}}>
               📲 Log your meals in <span style={{color:C.blue,fontWeight:700}}>Cronometer</span>, then enter your daily totals here. Takes 20 seconds and keeps your nutrition alongside your training data.
             </div>
 
@@ -593,7 +593,7 @@ export default function App(){
                 const isToday=dk===dKey;
                 const hasData=m.cal||m.protein;
                 return(
-                  <div key={dk} style={{padding:"9px 12px",borderBottom:i<6?`1px solid ${C.border2}`:"none",background:isToday?"rgba(96,165,250,0.04)":"transparent"}}>
+                  <div key={dk} style={{padding:"9px 12px",borderBottom:i<6?`1px solid ${C.border2}`:"none",background:isToday?"rgba(61,126,146,0.06)":"transparent"}}>
                     <div style={{display:"grid",gridTemplateColumns:"60px 1fr 50px 50px 50px 50px",gap:6,alignItems:"center"}}>
                       <div style={{fontSize:10,fontWeight:isToday?700:400,color:isToday?C.blue:C.gray}}>{isToday?"Today":weekLabel(dk.replace("day_",""))}</div>
                       <div style={{height:4,background:C.border2,borderRadius:2,overflow:"hidden"}}>
@@ -720,7 +720,7 @@ export default function App(){
                     {day:"Sat",type:"Long vest walk ⭐",   dur:"60–90 min",vest:true, hr:"110–125"},
                     {day:"Sun",type:"Easy recovery walk",  dur:"30–45 min",vest:false,hr:"90–100"},
                   ].map((w,i)=>(
-                    <div key={i} style={{padding:"10px 12px",borderBottom:i<6?`1px solid ${C.border2}`:"none",background:w.vest?"rgba(52,211,153,0.04)":"transparent"}}>
+                    <div key={i} style={{padding:"10px 12px",borderBottom:i<6?`1px solid ${C.border2}`:"none",background:w.vest?"rgba(78,140,69,0.06)":"transparent"}}>
                       <div style={{display:"grid",gridTemplateColumns:"38px 1fr 65px 45px 80px",gap:6,alignItems:"center"}}>
                         <div style={{fontSize:11,fontWeight:700,color:C.text}}>{w.day}</div>
                         <div style={{fontSize:10,color:w.vest?C.green:C.light,fontWeight:w.vest?600:400}}>{w.type}</div>
