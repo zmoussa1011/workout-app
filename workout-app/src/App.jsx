@@ -89,7 +89,7 @@ const SESSIONS=[
   {id:"vestwalk",label:"Vest Walk",emoji:"🦺",color:C.green,freq:"2×/week",desc:"45–90 min · Hills · 110–120 bpm · Non-gym days",details:"Non-gym days only — fresh legs. Drive through heels on hills.",
    logFields:[{id:"duration",label:"Duration (min)"},{id:"hr",label:"Avg HR (bpm)"},{id:"terrain",label:"Hills? (Y/N)"}]},
   {id:"walk",label:"Easy Walk",emoji:"🚶",color:C.blue,freq:"Daily",desc:"30–45 min · Flat · No vest · Recovery pace",details:"Non-negotiable daily anchor.",
-   logFields:[{id:"duration",label:"Duration (min)"},{id:"steps",label:"Steps"}]},
+   daily:true},
 ];
 
 const SUPPS=[
@@ -236,13 +236,24 @@ export default function App(){
   const autoWeek=startDate?Math.min(Math.max(Math.ceil((Math.floor((new Date()-new Date(startDate))/86400000)+1)/7),1),TOTAL):null;
 
   const upd=(fn)=>setData(d=>{const n={...d};fn(n);return n;});
+  const isDaily=(sid)=>SESSIONS.find(s=>s.id===sid)?.daily;
   const toggleSess=(sid)=>upd(d=>{
-    const wk=d[wKey]||{},sess=wk[sid]||{},done=!sess.done;
-    const today=new Date().toLocaleDateString("en-US",{weekday:"short",month:"short",day:"numeric"});
-    d[wKey]={...wk,[sid]:{...sess,done,day:done?(sess.day||today):sess.day}};
+    if(isDaily(sid)){
+      const dd=d[dKey]||{}; d[dKey]={...dd,[`sess_${sid}`]:!dd[`sess_${sid}`]};
+    } else {
+      const wk=d[wKey]||{},sess=wk[sid]||{},done=!sess.done;
+      const today=new Date().toLocaleDateString("en-US",{weekday:"short",month:"short",day:"numeric"});
+      d[wKey]={...wk,[sid]:{...sess,done,day:done?(sess.day||today):sess.day}};
+    }
   });
   const setDay=(sid,v)=>upd(d=>{d[wKey]={...(d[wKey]||{}),[sid]:{...(d[wKey]?.[sid]||{}),day:v}};});
-  const setLog=(sid,fid,v)=>upd(d=>{const s=d[wKey]?.[sid]||{};d[wKey]={...(d[wKey]||{}),[sid]:{...s,log:{...(s.log||{}),[fid]:v}}};});
+  const setLog=(sid,fid,v)=>upd(d=>{
+    if(isDaily(sid)){
+      d[dKey]={...(d[dKey]||{}), [`log_${sid}_${fid}`]:v};
+    } else {
+      const s=d[wKey]?.[sid]||{};d[wKey]={...(d[wKey]||{}),[sid]:{...s,log:{...(s.log||{}),[fid]:v}}};
+    }
+  });
   const setWt=(sid,ex,wi,v)=>upd(d=>{const k=`w${wi+1}`,s=d[k]?.[sid]||{};d[k]={...(d[k]||{}),[sid]:{...s,weights:{...(s.weights||{}),[ex]:v}}};});
   const setRepsLog=(sid,ex,setIdx,v)=>upd(d=>{const s=d[wKey]?.[sid]||{};const prev=s.repsLog?.[ex]||[];const next=[...prev];next[setIdx]=v;d[wKey]={...(d[wKey]||{}),[sid]:{...s,repsLog:{...(s.repsLog||{}),[ex]:next}}};});
   const toggleDay=(pfx,id)=>upd(d=>{const dd=d[dKey]||{};d[dKey]={...dd,[`${pfx}_${id}`]:!dd[`${pfx}_${id}`]};});
@@ -354,7 +365,11 @@ export default function App(){
           </div>
         )}
         {tab==="tracker"&&SESSIONS.map(s=>{
-          const sd=wData[s.id]||{},done=sd.done||false,open=openSess===s.id;
+          const isD=s.daily;
+          const sd=isD
+            ?{done:!!dData[`sess_${s.id}`],log:Object.fromEntries((s.logFields||[]).map(f=>[f.id,dData[`log_${s.id}_${f.id}`]||""]))}
+            :wData[s.id]||{};
+          const done=sd.done||false,open=openSess===s.id;
           return(
             <div key={s.id} style={{background:done?`${s.color}09`:C.card,border:`1px solid ${done?s.color+"35":C.border}`,borderRadius:12,marginBottom:8,overflow:"hidden",transition:"all 0.2s"}}>
               <div style={{display:"flex",alignItems:"center",padding:"12px 14px",gap:10}}>
@@ -373,8 +388,11 @@ export default function App(){
               {open&&(
                 <div style={{borderTop:`1px solid ${s.color}20`,padding:"12px 14px",background:`${s.color}04`}}>
                   <div style={{fontSize:11,color:C.muted,marginBottom:10}}>{s.details}</div>
-                  <label style={{fontSize:10,color:C.dim,fontWeight:700,display:"block",marginBottom:5}}>DAY COMPLETED</label>
-                  <input type="text" placeholder="e.g. Monday" value={sd.day||""} onChange={e=>setDay(s.id,e.target.value)} style={{...iSty,marginBottom:12}}/>
+                  {isD
+                    ?<div style={{fontSize:10,color:s.color,fontWeight:600,marginBottom:12}}>📅 Resets daily · {new Date().toLocaleDateString("en-US",{weekday:"long",month:"short",day:"numeric"})}</div>
+                    :<><label style={{fontSize:10,color:C.dim,fontWeight:700,display:"block",marginBottom:5}}>DAY COMPLETED</label>
+                  <input type="text" placeholder="e.g. Monday" value={sd.day||""} onChange={e=>setDay(s.id,e.target.value)} style={{...iSty,marginBottom:12}}/></>
+                  }
 
                   {/* HIIT rounds */}
                   {s.id==="hiit"&&(
@@ -413,30 +431,31 @@ export default function App(){
                                 </div>
                                 <div style={{fontSize:10,color:C.gray}}>{r.note}</div>
                                 {/* Rest timer trigger — shown after marking done, if rest exists */}
-                                {isDone&&restSecs&&(
-                                  <div style={{marginTop:6}}>
-                                    {isTimingThisRound?(
-                                      <span style={{fontSize:10,color:C.red,fontWeight:700}}>
-                                        resting {Math.floor(timer.seconds/60).toString().padStart(2,"0")}:{(timer.seconds%60).toString().padStart(2,"0")}
-                                      </span>
-                                    ):(
-                                      <button onClick={()=>startRestTimer(i,r.rest)} style={{background:"rgba(248,113,113,0.1)",border:"1px solid rgba(248,113,113,0.25)",borderRadius:6,padding:"3px 9px",color:C.red,cursor:"pointer",fontSize:10,fontWeight:700}}>
-                                        ▶ Rest {r.rest}
-                                      </button>
-                                    )}
-                                  </div>
-                                )}
+                                {isDone&&(()=>{
+                                  const effectiveRest=rd.rest?`${rd.rest}s`:r.rest;
+                                  const effectiveSecs=parseRest(effectiveRest);
+                                  if(!effectiveSecs) return null;
+                                  const label=rd.rest?`${rd.rest}s`:r.rest;
+                                  return(
+                                    <div style={{marginTop:6}}>
+                                      {isTimingThisRound?(
+                                        <span style={{fontSize:10,color:C.red,fontWeight:700}}>
+                                          resting {Math.floor(timer.seconds/60).toString().padStart(2,"0")}:{(timer.seconds%60).toString().padStart(2,"0")}
+                                        </span>
+                                      ):(
+                                        <button onClick={()=>startRestTimer(i,effectiveRest)} style={{background:"rgba(200,101,62,0.1)",border:"1px solid rgba(200,101,62,0.25)",borderRadius:6,padding:"3px 9px",color:C.red,cursor:"pointer",fontSize:10,fontWeight:700}}>
+                                          ▶ Rest {label}
+                                        </button>
+                                      )}
+                                    </div>
+                                  );
+                                })()}
                               </div>
                             </div>
                             {!isDone&&(
-                              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:5,paddingLeft:32}}>
+                              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:5,paddingLeft:32}}>
                                 <div><div style={{fontSize:8,color:C.dim,marginBottom:2}}>Actual Level</div><input type="number" placeholder={sug||r.level.split("–")[0]} value={rd.actualLevel||""} onChange={e=>setHiitRound(i,"actualLevel",e.target.value)} style={{...iSty,padding:"5px 7px",fontSize:11}}/></div>
                                 <div><div style={{fontSize:8,color:C.dim,marginBottom:2}}>Rest (sec)</div><input type="number" placeholder={r.rest==="—"?"—":r.rest.replace("s","")} value={rd.rest||""} onChange={e=>setHiitRound(i,"rest",e.target.value)} style={{...iSty,padding:"5px 7px",fontSize:11}}/></div>
-                                <div><div style={{fontSize:8,color:C.dim,marginBottom:2}}>Effort</div>
-                                  <select value={rd.effort||""} onChange={e=>setHiitRound(i,"effort",e.target.value)} style={{...iSty,padding:"5px 7px",fontSize:11}}>
-                                    <option value="">—</option><option value="easy">Easy</option><option value="good">Good</option><option value="hard">Hard</option>
-                                  </select>
-                                </div>
                               </div>
                             )}
                           </div>
