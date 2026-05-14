@@ -376,7 +376,6 @@ export default function App(){
     {id:"loads",  label:"Loads",  icon:"🏋️"},
     {id:"daily",  label:"Daily",  icon:"☀️"},
     {id:"plan",   label:"Plan",   icon:"📋"},
-    {id:"ref",    label:"Targets",icon:"🎯"},
   ];
   const PLAN_SUBS=[{id:"split",label:"Weekly Split"},{id:"walks",label:"Walk Protocol"},{id:"progress",label:"Progression"}];
 
@@ -708,50 +707,56 @@ export default function App(){
           </div>
         )}
 
-        {/* ══ DAILY CHECKLIST ══ */}
+        {/* ══ DAILY ══ */}
         {tab==="daily"&&(
           <div>
+            {/* Progress bar */}
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:14}}>
-              <Card style={{padding:"12px 14px"}}><div style={{fontSize:22,fontWeight:800,color:suppsDone===SUPPS.length?C.green:C.yellow}}>{suppsDone}<span style={{fontSize:14,color:C.dim,fontWeight:400}}>/{SUPPS.length}</span></div><div style={{fontSize:10,color:C.gray,marginTop:2}}>Supplements taken</div></Card>
-              <Card style={{padding:"12px 14px"}}><div style={{fontSize:22,fontWeight:800,color:targetsDone===TARGETS.length?C.green:C.blue}}>{targetsDone}<span style={{fontSize:14,color:C.dim,fontWeight:400}}>/{TARGETS.length}</span></div><div style={{fontSize:10,color:C.gray,marginTop:2}}>Daily targets hit</div></Card>
+              <Card style={{padding:"12px 14px"}}>
+                <div style={{fontSize:22,fontWeight:800,color:suppsDone===SUPPS.length?C.green:C.yellow}}>{suppsDone}<span style={{fontSize:14,color:C.dim,fontWeight:400}}>/{SUPPS.length}</span></div>
+                <div style={{fontSize:10,color:C.gray,marginTop:2}}>Supplements taken</div>
+              </Card>
+              <Card style={{padding:"12px 14px"}}>
+                <div style={{fontSize:22,fontWeight:800,color:targetsDone===TARGETS.length?C.green:C.blue}}>{targetsDone}<span style={{fontSize:14,color:C.dim,fontWeight:400}}>/{TARGETS.length}</span></div>
+                <div style={{fontSize:10,color:C.gray,marginTop:2}}>Daily targets hit</div>
+              </Card>
             </div>
 
+            {/* Supplements cards */}
             <div style={slbl}>💊 SUPPLEMENTS</div>
-            <Card style={{overflow:"hidden",marginBottom:14}}>
-              {SUPPS.map((s,i)=>{
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:7,marginBottom:16}}>
+              {SUPPS.map(s=>{
                 const ch=!!dData[`s_${s.id}`];
                 return(
-                  <div key={s.id} onClick={()=>toggleDay("s",s.id)} style={{display:"flex",alignItems:"center",gap:12,padding:"13px 14px",borderBottom:i<SUPPS.length-1?`1px solid ${C.border2}`:"none",background:ch?`${s.color}07`:"transparent",cursor:"pointer",transition:"background 0.15s"}}>
-                    <Tick checked={ch} color={s.color}/>
-                    <span style={{fontSize:20,flexShrink:0}}>{s.emoji}</span>
-                    <div style={{flex:1}}>
-                      <div style={{fontSize:13,fontWeight:700,color:ch?s.color:C.text,transition:"color 0.15s"}}>{s.label}</div>
-                      <div style={{fontSize:10,color:C.gray,marginTop:1}}>{s.when}</div>
-                    </div>
-                    {ch&&<span style={{fontSize:13,color:s.color,fontWeight:800}}>✓</span>}
+                  <div key={s.id} onClick={()=>toggleDay("s",s.id)}
+                    style={{background:ch?`${s.color}12`:C.card,border:`1.5px solid ${ch?s.color:C.border}`,borderRadius:12,padding:"13px 11px",cursor:"pointer",transition:"all 0.15s",position:"relative"}}>
+                    <div style={{fontSize:22,marginBottom:5}}>{s.emoji}</div>
+                    <div style={{fontSize:12,fontWeight:700,color:ch?s.color:C.text,marginBottom:3,lineHeight:1.3}}>{s.label}</div>
+                    <div style={{fontSize:9,color:C.dim,lineHeight:1.4}}>{s.when}</div>
+                    {ch&&<div style={{position:"absolute",top:8,right:10,fontSize:12,color:s.color,fontWeight:800}}>✓</div>}
                   </div>
                 );
               })}
-            </Card>
+            </div>
 
+            {/* Targets cards */}
             <div style={slbl}>🎯 DAILY TARGETS</div>
-            <Card style={{overflow:"hidden",marginBottom:14}}>
-              {TARGETS.map((t,i)=>{
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:7,marginBottom:16}}>
+              {TARGETS.map(t=>{
                 const ch=!!dData[`t_${t.id}`];
                 return(
-                  <div key={t.id} onClick={()=>toggleDay("t",t.id)} style={{display:"flex",alignItems:"center",gap:12,padding:"13px 14px",borderBottom:i<TARGETS.length-1?`1px solid ${C.border2}`:"none",background:ch?`${t.color}07`:"transparent",cursor:"pointer",transition:"background 0.15s"}}>
-                    <Tick checked={ch} color={t.color}/>
-                    <span style={{fontSize:20,flexShrink:0}}>{t.emoji}</span>
-                    <div style={{flex:1}}>
-                      <div style={{fontSize:13,fontWeight:700,color:ch?t.color:C.text,transition:"color 0.15s"}}>{t.label}</div>
-                      <div style={{fontSize:10,color:C.gray,marginTop:1}}>{t.note}</div>
-                    </div>
-                    {ch&&<span style={{fontSize:13,color:t.color,fontWeight:800}}>✓</span>}
+                  <div key={t.id} onClick={()=>toggleDay("t",t.id)}
+                    style={{background:ch?`${t.color}12`:C.card,border:`1.5px solid ${ch?t.color:C.border}`,borderRadius:12,padding:"13px 11px",cursor:"pointer",transition:"all 0.15s",position:"relative"}}>
+                    <div style={{fontSize:22,marginBottom:5}}>{t.emoji}</div>
+                    <div style={{fontSize:13,fontWeight:800,color:ch?t.color:C.text,marginBottom:3}}>{t.label}</div>
+                    <div style={{fontSize:9,color:C.dim,lineHeight:1.4}}>{t.note}</div>
+                    {ch&&<div style={{position:"absolute",top:8,right:10,fontSize:12,color:t.color,fontWeight:800}}>✓</div>}
                   </div>
                 );
               })}
-            </Card>
-            <button onClick={()=>{if(window.confirm("Reset today?"))upd(d=>{delete d[dKey];});}} style={{width:"100%",background:"none",border:`1px solid ${C.border}`,borderRadius:9,padding:"10px 0",color:C.dim,fontSize:12,cursor:"pointer"}}>Reset Today's Checklist</button>
+            </div>
+
+            <button onClick={()=>{if(window.confirm("Reset today?"))upd(d=>{delete d[dKey];});}} style={{width:"100%",background:"none",border:`1px solid ${C.border}`,borderRadius:9,padding:"10px 0",color:C.dim,fontSize:12,cursor:"pointer"}}>Reset Today</button>
           </div>
         )}
 
@@ -865,18 +870,6 @@ export default function App(){
           </div>
         )}
 
-        {/* ══ TARGETS REFERENCE ══ */}
-        {tab==="ref"&&(
-          <div>
-            <div style={slbl}>DAILY TARGETS</div>
-            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:7,marginBottom:18}}>
-              {[{label:"Move Ring",value:"600 kcal",color:C.red,note:"Floor not ceiling"},{label:"Exercise",value:"45 min",color:C.green,note:"Walk closes it"},{label:"Stand Ring",value:"10 hrs",color:C.blue,note:"Data sweet spot"},{label:"Protein",value:"115–120g",color:C.purple,note:"Non-negotiable"},{label:"Fiber",value:"25–30g",color:C.green,note:"Chia+flax = 14g"},{label:"Water",value:"2–2.5 L",color:C.blue,note:"+500ml gym days"}].map(t=>(
-                <Card key={t.label} style={{padding:"10px 9px"}}><div style={{fontSize:15,fontWeight:800,color:t.color,marginBottom:2}}>{t.value}</div><div style={{fontSize:9,fontWeight:700,color:C.muted,marginBottom:1}}>{t.label}</div><div style={{fontSize:8,color:C.dim}}>{t.note}</div></Card>
-              ))}
-            </div>
-
-          </div>
-        )}
 
       </div>
     </div>
