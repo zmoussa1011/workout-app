@@ -164,6 +164,8 @@ export default function App(){
   const [planSub,setPlanSub]=useState("split");
   const [timer,setTimer]=useState({active:false,seconds:0,roundIdx:null});
   const [importMsg,setImportMsg]=useState(null);
+  const [sundayBanner,setSundayBanner]=useState(false);
+  const [notifEnabled,setNotifEnabled]=useState(()=>localStorage.getItem("notif_enabled")==="true");
   const importRef=useRef();
   const TOTAL=6;
 
@@ -189,6 +191,29 @@ export default function App(){
     return()=>clearInterval(id);
   },[timer.active,timer.seconds]);
 
+  // Sunday export reminder
+  useEffect(()=>{
+    const today=new Date();
+    if(today.getDay()!==0) return; // 0 = Sunday
+    const todayStr=today.toISOString().slice(0,10);
+    if(localStorage.getItem("last_reminder")===todayStr) return;
+    localStorage.setItem("last_reminder",todayStr);
+    setSundayBanner(true);
+    if(notifEnabled&&"Notification" in window&&Notification.permission==="granted"){
+      new Notification("Workout Tracker 💾",{body:"Sunday reminder — export your data backup before the week resets!"});
+    }
+  },[]);
+
+  const enableNotifications=async()=>{
+    if(!("Notification" in window)){alert("Notifications not supported on this browser.");return;}
+    const perm=await Notification.requestPermission();
+    if(perm==="granted"){
+      setNotifEnabled(true);
+      localStorage.setItem("notif_enabled","true");
+      new Notification("Workout Tracker ✅",{body:"Sunday export reminders are on!"});
+    }
+  };
+
   const startRestTimer=(idx,restStr)=>{
     const secs=parseRest(restStr);
     if(!secs) return;
@@ -212,6 +237,87 @@ export default function App(){
     };
     reader.readAsText(file);
     e.target.value="";
+  };
+
+  const generateWeeklySummary=()=>{
+    const w=data[wKey]||{};
+    const lines=[];
+    lines.push(`# Weekly Workout Summary — Week ${week} of ${TOTAL}`);
+    lines.push(`Date: ${new Date().toLocaleDateString("en-US",{weekday:"long",month:"long",day:"numeric",year:"numeric"})}`);
+    lines.push("");
+
+    // Sessions
+    lines.push("## Sessions This Week");
+    SESSIONS.forEach(s=>{
+      const sd=s.daily?{done:!!dData[`sess_${s.id}`]}:(w[s.id]||{});
+      lines.push(`${sd.done?"✅":"⬜"} ${s.label}${sd.day?` — ${sd.day}`:""}`);
+    });
+    lines.push("");
+
+    // HIIT
+    const hiitRounds=dData.hiitRounds||[];
+    if(hiitRounds.some(r=>r.done)){
+      lines.push("## HIIT Round Log");
+      HIIT_BASE.forEach((r,i)=>{
+        const rd=hiitRounds[i]||{};
+        if(rd.done) lines.push(`- Round ${r.round} (${r.phase}): Level ${rd.actualLevel||r.level} | Rest ${rd.rest?rd.rest+"s":r.rest}`);
+      });
+      lines.push("");
+    }
+
+    // Gym weights & reps
+    SESSIONS.filter(s=>s.exercises).forEach(s=>{
+      const sd=w[s.id]||{};
+      const hasData=Object.keys(sd.weights||{}).length||Object.keys(sd.repsLog||{}).length;
+      if(!hasData) return;
+      lines.push(`## ${s.label}${sd.done?" ✅":""}`);
+      s.exercises.forEach(ex=>{
+        const wt=(sd.weights||{})[ex.name];
+        const reps=(sd.repsLog||{})[ex.name]||[];
+        const {sets,repsMin}=parseSets(ex.sets);
+        const allHit=reps.length>=sets&&reps.slice(0,sets).every(r=>Number(r)>=repsMin);
+        if(wt||reps.length){
+          lines.push(`- ${ex.name}: ${wt?wt+" lbs":"—"} | ${ex.sets} | Reps: ${reps.slice(0,sets).join(", ")||"not logged"}${reps.length?(allHit?" ✅":" ⚡ partial"):""}`);
+        }
+      });
+      lines.push("");
+    });
+
+    // Daily checklist
+    const suppsDoneN=SUPPS.filter(s=>dData[`s_${s.id}`]).length;
+    const targetsDoneN=TARGETS.filter(t=>dData[`t_${t.id}`]).length;
+    lines.push("## Daily Checklist");
+    lines.push(`Supplements: ${suppsDoneN}/${SUPPS.length} | Targets: ${targetsDoneN}/${TARGETS.length}`);
+    TARGETS.forEach(t=>lines.push(`${dData[`t_${t.id}`]?"✅":"⬜"} ${t.label}`));
+    lines.push("");
+
+    // Progressive overload suggestions
+    if(week>1){
+      const suggestions=[];
+      SESSIONS.filter(s=>s.exercises).forEach(s=>{
+        s.exercises.forEach(ex=>{
+          const sug=suggestExWeight(data[`w${week-1}`]||{},s.id,ex.name,ex.sets);
+          if(sug) suggestions.push(`- ${ex.name}: ${sug.allHit?`Hit all reps → try ${sug.weight} lbs next week`:`Partial reps → stay at ${sug.weight} lbs, aim for ${sug.suggestedReps} reps/set`}`);
+        });
+      });
+      if(suggestions.length){
+        lines.push("## Progressive Overload Notes");
+        lines.push(...suggestions);
+        lines.push("");
+      }
+    }
+
+    lines.push("---");
+    lines.push("Please give me a weekly summary covering: what went well, what to improve next week, and specific progressive overload recommendations based on the data above.");
+    return lines.join("\n");
+  };
+
+  const copyForClaude=()=>{
+    const text=generateWeeklySummary();
+    navigator.clipboard.writeText(text).then(()=>{
+      setImportMsg("✓ Copied! Open Claude.ai and paste");
+      setTimeout(()=>setImportMsg(null),4000);
+    });
   };
 
   const exportData=()=>{
@@ -269,11 +375,10 @@ export default function App(){
     {id:"tracker",label:"Tracker",icon:"✓"},
     {id:"loads",  label:"Loads",  icon:"🏋️"},
     {id:"daily",  label:"Daily",  icon:"☀️"},
-    {id:"macros", label:"Macros", icon:"🥗"},
     {id:"plan",   label:"Plan",   icon:"📋"},
     {id:"ref",    label:"Targets",icon:"🎯"},
   ];
-  const PLAN_SUBS=[{id:"split",label:"Weekly Split"},{id:"gym",label:"Gym Sessions"},{id:"walks",label:"Walk Protocol"},{id:"progress",label:"Progression"}];
+  const PLAN_SUBS=[{id:"split",label:"Weekly Split"},{id:"walks",label:"Walk Protocol"},{id:"progress",label:"Progression"}];
 
   return(
     <div style={{background:C.bg,minHeight:"100vh",fontFamily:"'DM Sans',system-ui,sans-serif",color:C.text,fontSize:13}}>
@@ -311,7 +416,7 @@ export default function App(){
                 )}
               </div>
             )}
-            {(tab==="daily"||tab==="macros")&&<div style={{fontSize:10,color:C.gray}}>{new Date().toLocaleDateString("en-US",{weekday:"long",month:"short",day:"numeric"})}</div>}
+            {tab==="daily"&&<div style={{fontSize:10,color:C.gray}}>{new Date().toLocaleDateString("en-US",{weekday:"long",month:"short",day:"numeric"})}</div>}
           </div>
 
           {/* Progress bars */}
@@ -327,12 +432,6 @@ export default function App(){
               <div style={{height:3,background:C.border2,borderRadius:2,overflow:"hidden"}}><div style={{height:"100%",width:`${((suppsDone+targetsDone)/(SUPPS.length+TARGETS.length))*100}%`,background:`linear-gradient(90deg,${C.yellow},${C.purple})`,borderRadius:2,transition:"width 0.4s"}}/></div>
             </div>
           )}
-          {tab==="macros"&&(
-            <div style={{marginBottom:10}}>
-              <div style={{display:"flex",justifyContent:"space-between",marginBottom:3}}><span style={{fontSize:9,color:C.dim}}>Today's calories</span><span style={{fontSize:9,color:C.blue,fontWeight:700}}>{Number(macros.cal)||0} / {MACRO_GOALS.cal} kcal</span></div>
-              <div style={{height:3,background:C.border2,borderRadius:2,overflow:"hidden"}}><div style={{height:"100%",width:`${Math.min(((Number(macros.cal)||0)/MACRO_GOALS.cal)*100,100)}%`,background:`linear-gradient(90deg,${C.blue},${C.green})`,borderRadius:2,transition:"width 0.4s"}}/></div>
-            </div>
-          )}
 
           {/* Tabs */}
           <div style={{display:"flex",gap:1}}>
@@ -346,6 +445,21 @@ export default function App(){
       </div>
 
       <div style={{maxWidth:680,margin:"0 auto",padding:14,paddingBottom:"calc(40px + env(safe-area-inset-bottom, 0px))"}}>
+
+        {/* Sunday reminder banner */}
+        {sundayBanner&&(
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",background:"rgba(184,137,42,0.1)",border:`1px solid rgba(184,137,42,0.3)`,borderRadius:10,padding:"11px 14px",marginBottom:12}}>
+            <div>
+              <div style={{fontSize:12,fontWeight:700,color:C.yellow}}>📅 Sunday reminder</div>
+              <div style={{fontSize:10,color:C.gray,marginTop:2}}>Export your backup before the week resets</div>
+            </div>
+            <div style={{display:"flex",gap:7,alignItems:"center"}}>
+              <button onClick={()=>{exportData();setSundayBanner(false);}} style={{background:C.yellow,border:"none",borderRadius:7,padding:"6px 11px",color:"#fff",fontSize:11,fontWeight:700,cursor:"pointer"}}>Export</button>
+              <button onClick={()=>{copyForClaude();setSundayBanner(false);}} style={{background:C.purple,border:"none",borderRadius:7,padding:"6px 11px",color:"#fff",fontSize:11,fontWeight:700,cursor:"pointer"}}>📋 Copy for Claude</button>
+              <button onClick={()=>setSundayBanner(false)} style={{background:"none",border:"none",color:C.dim,cursor:"pointer",fontSize:16,lineHeight:1}}>✕</button>
+            </div>
+          </div>
+        )}
 
         {/* ══ TRACKER ══ */}
         {tab==="tracker"&&(
@@ -585,7 +699,11 @@ export default function App(){
               <button onClick={()=>{if(window.confirm(`Reset Week ${week}?`))upd(d=>{delete d[wKey];})}} style={{flex:1,background:"none",border:`1px solid ${C.border}`,borderRadius:9,padding:"10px 0",color:C.dim,fontSize:12,cursor:"pointer"}}>Reset Week {week}</button>
               <button onClick={()=>importRef.current.click()} style={{flex:1,background:"rgba(78,140,69,0.07)",border:`1px solid rgba(78,140,69,0.25)`,borderRadius:9,padding:"10px 0",color:C.green,fontSize:12,cursor:"pointer",fontWeight:600}}>⬆ Import</button>
               <button onClick={exportData} style={{flex:1,background:"rgba(61,126,146,0.07)",border:`1px solid rgba(61,126,146,0.25)`,borderRadius:9,padding:"10px 0",color:C.blue,fontSize:12,cursor:"pointer",fontWeight:600}}>⬇ Export</button>
+              <button onClick={copyForClaude} style={{flex:1,background:"rgba(158,107,126,0.07)",border:`1px solid rgba(158,107,126,0.25)`,borderRadius:9,padding:"10px 0",color:C.purple,fontSize:12,cursor:"pointer",fontWeight:600}}>📋 Claude</button>
             </div>
+            <button onClick={enableNotifications} style={{width:"100%",marginTop:8,background:notifEnabled?"rgba(78,140,69,0.07)":"none",border:`1px solid ${notifEnabled?C.green+"40":C.border}`,borderRadius:9,padding:"10px 0",color:notifEnabled?C.green:C.dim,fontSize:12,cursor:"pointer"}}>
+              {notifEnabled?"🔔 Sunday reminders on":"🔔 Enable Sunday export reminder"}
+            </button>
             <input ref={importRef} type="file" accept=".json" onChange={importData} style={{display:"none"}}/>
           </div>
         )}
@@ -637,86 +755,6 @@ export default function App(){
           </div>
         )}
 
-        {/* ══ MACROS (manual entry from Cronometer) ══ */}
-        {tab==="macros"&&(
-          <div>
-            {/* Instructions */}
-            <div style={{background:"rgba(61,126,146,0.06)",border:`1px solid rgba(61,126,146,0.2)`,borderRadius:10,padding:"11px 13px",marginBottom:14,fontSize:11,color:C.muted,lineHeight:1.6}}>
-              📲 Log your meals in <span style={{color:C.blue,fontWeight:700}}>Cronometer</span>, then enter your daily totals here. Takes 20 seconds and keeps your nutrition alongside your training data.
-            </div>
-
-            {/* Today's input */}
-            <div style={slbl}>TODAY'S TOTALS — from Cronometer</div>
-            <Card style={{padding:"14px",marginBottom:14}}>
-              <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,marginBottom:12}}>
-                {[
-                  {field:"cal",    label:"Calories",   unit:"kcal", color:C.blue,   goal:MACRO_GOALS.cal},
-                  {field:"protein",label:"Protein",    unit:"g",    color:C.purple, goal:MACRO_GOALS.protein},
-                  {field:"carbs",  label:"Carbs",      unit:"g",    color:C.yellow, goal:MACRO_GOALS.carbs},
-                  {field:"fat",    label:"Fat",        unit:"g",    color:C.orange, goal:MACRO_GOALS.fat},
-                  {field:"fiber",  label:"Fiber",      unit:"g",    color:C.green,  goal:MACRO_GOALS.fiber},
-                ].map(m=>(
-                  <div key={m.field}>
-                    <label style={{fontSize:10,color:C.gray,display:"block",marginBottom:3}}>{m.label} <span style={{color:C.dim}}>({m.unit}) — goal: {m.goal}</span></label>
-                    <input type="number" placeholder="0" value={macros[m.field]||""} onChange={e=>setMacro(m.field,e.target.value)}
-                      style={{...iSty,borderColor:macros[m.field]?m.color+60:C.border,color:macros[m.field]?m.color:C.muted,fontWeight:macros[m.field]?700:400}}/>
-                  </div>
-                ))}
-              </div>
-
-              {/* Progress bars */}
-              <MBar label="Calories" val={macros.cal}     goal={MACRO_GOALS.cal}     color={C.blue}   unit=" kcal"/>
-              <MBar label="Protein"  val={macros.protein} goal={MACRO_GOALS.protein} color={C.purple} />
-              <MBar label="Carbs"    val={macros.carbs}   goal={MACRO_GOALS.carbs}   color={C.yellow} />
-              <MBar label="Fat"      val={macros.fat}     goal={MACRO_GOALS.fat}     color={C.orange} />
-              <MBar label="Fiber"    val={macros.fiber}   goal={MACRO_GOALS.fiber}   color={C.green}  />
-            </Card>
-
-            {/* 7-day history */}
-            <div style={slbl}>7-DAY OVERVIEW</div>
-            <Card style={{overflow:"hidden",marginBottom:14}}>
-              <div style={{padding:"10px 12px",background:C.border2,borderBottom:`1px solid ${C.border}`}}>
-                <div style={{display:"grid",gridTemplateColumns:"60px 1fr 50px 50px 50px 50px",gap:6}}>
-                  {["Date","Cal","Pro","Carb","Fat","Fib"].map(h=><div key={h} style={{fontSize:9,fontWeight:700,color:C.dim,textTransform:"uppercase"}}>{h}</div>)}
-                </div>
-              </div>
-              {last7Days().map((dk,i)=>{
-                const d=data[dk]||{};
-                const m=d.macros||{};
-                const isToday=dk===dKey;
-                const hasData=m.cal||m.protein;
-                return(
-                  <div key={dk} style={{padding:"9px 12px",borderBottom:i<6?`1px solid ${C.border2}`:"none",background:isToday?"rgba(61,126,146,0.06)":"transparent"}}>
-                    <div style={{display:"grid",gridTemplateColumns:"60px 1fr 50px 50px 50px 50px",gap:6,alignItems:"center"}}>
-                      <div style={{fontSize:10,fontWeight:isToday?700:400,color:isToday?C.blue:C.gray}}>{isToday?"Today":weekLabel(dk.replace("day_",""))}</div>
-                      <div style={{height:4,background:C.border2,borderRadius:2,overflow:"hidden"}}>
-                        {m.cal&&<div style={{height:"100%",width:`${Math.min((Number(m.cal)/MACRO_GOALS.cal)*100,100)}%`,background:Number(m.cal)>=MACRO_GOALS.cal?C.green:C.blue,borderRadius:2}}/>}
-                      </div>
-                      {[{f:"cal",c:C.blue},{f:"protein",c:C.purple},{f:"carbs",c:C.yellow},{f:"fat",c:C.orange},{f:"fiber",c:C.green}].slice(0,4).map(x=>(
-                        <div key={x.f} style={{fontSize:10,color:m[x.f]?x.c:C.dim,fontWeight:m[x.f]?600:400}}>{m[x.f]||"—"}</div>
-                      ))}
-                      <div style={{fontSize:10,color:m.fiber?C.green:C.dim,fontWeight:m.fiber?600:400}}>{m.fiber||"—"}</div>
-                    </div>
-                  </div>
-                );
-              })}
-            </Card>
-
-            {/* Macro targets reminder */}
-            <Card style={{padding:"12px 14px"}}>
-              <div style={{fontSize:11,fontWeight:700,color:C.muted,marginBottom:8}}>YOUR TARGETS</div>
-              <div style={{display:"grid",gridTemplateColumns:"repeat(5,1fr)",gap:6,textAlign:"center"}}>
-                {[{label:"Calories",val:"1700",unit:"kcal",color:C.blue},{label:"Protein",val:"118",unit:"g",color:C.purple},{label:"Carbs",val:"115",unit:"g",color:C.yellow},{label:"Fat",val:"55",unit:"g",color:C.orange},{label:"Fiber",val:"28",unit:"g",color:C.green}].map(t=>(
-                  <div key={t.label} style={{padding:"8px 4px",background:C.bg,borderRadius:8,border:`1px solid ${C.border2}`}}>
-                    <div style={{fontSize:14,fontWeight:800,color:t.color}}>{t.val}</div>
-                    <div style={{fontSize:8,color:C.dim}}>{t.unit}</div>
-                    <div style={{fontSize:8,color:C.gray,marginTop:1}}>{t.label}</div>
-                  </div>
-                ))}
-              </div>
-            </Card>
-          </div>
-        )}
 
         {/* ══ PLAN ══ */}
         {tab==="plan"&&(
@@ -765,36 +803,6 @@ export default function App(){
               </div>
             )}
 
-            {planSub==="gym"&&(
-              <div>
-                {[
-                  {label:"Monday — HIIT",color:C.red,emoji:"⚡",note:"8 rounds · Starting guide built in · Levels update from previous session",
-                   items:HIIT_BASE.map(r=>({name:`Round ${r.round} — ${r.phase}`,detail:`Level ${r.level} · ${r.dur}${r.rest!=="—"?` · Rest ${r.rest}`:""} · ${r.note}`}))},
-                  {label:"Tuesday — Glute Day A",color:C.purple,emoji:"🍑",note:"45–55 min · Hip thrusts heavy — your #1 glute builder",
-                   items:SESSIONS.find(s=>s.id==="glute").exercises.map(ex=>({name:ex.name,detail:`${ex.sets} · ${ex.note}`}))},
-                  {label:"Wednesday — Back Day",color:C.blue,emoji:"🔙",note:"45–55 min · Full stretch every pull",
-                   items:SESSIONS.find(s=>s.id==="back").exercises.map(ex=>({name:ex.name,detail:`${ex.sets} · ${ex.note}`}))},
-                  {label:"Thursday — Posterior Chain",color:C.green,emoji:"⛓️",note:"50–60 min · Deadlifts anchor this day",
-                   items:SESSIONS.find(s=>s.id==="posterior").exercises.map(ex=>({name:ex.name,detail:`${ex.sets} · ${ex.note}`}))},
-                ].map((sess,si)=>(
-                  <div key={si} style={{marginBottom:18}}>
-                    <div style={{display:"flex",alignItems:"center",gap:7,marginBottom:5}}>
-                      <span style={{fontSize:15}}>{sess.emoji}</span>
-                      <span style={{fontSize:13,fontWeight:700,color:sess.color}}>{sess.label}</span>
-                    </div>
-                    <div style={{fontSize:10,color:C.gray,marginBottom:8,padding:"6px 9px",background:`${sess.color}0d`,borderRadius:7,border:`1px solid ${sess.color}20`}}>{sess.note}</div>
-                    <Card style={{overflow:"hidden"}}>
-                      {sess.items.map((item,ii)=>(
-                        <div key={ii} style={{padding:"10px 12px",borderBottom:ii<sess.items.length-1?`1px solid ${C.border2}`:"none"}}>
-                          <div style={{fontSize:12,fontWeight:600,color:C.text,marginBottom:2}}>{item.name}</div>
-                          <div style={{fontSize:10,color:C.gray,lineHeight:1.4}}>{item.detail}</div>
-                        </div>
-                      ))}
-                    </Card>
-                  </div>
-                ))}
-              </div>
-            )}
 
             {planSub==="walks"&&(
               <div>
@@ -867,30 +875,6 @@ export default function App(){
               ))}
             </div>
 
-            <div style={slbl}>SUPPLEMENT TIMING</div>
-            <Card style={{overflow:"hidden",marginBottom:18}}>
-              {SUPPS.map((s,i)=>(
-                <div key={s.id} style={{display:"flex",alignItems:"center",gap:12,padding:"11px 14px",borderBottom:i<SUPPS.length-1?`1px solid ${C.border2}`:"none"}}>
-                  <span style={{fontSize:20,flexShrink:0}}>{s.emoji}</span>
-                  <div><div style={{fontSize:12,fontWeight:700,color:s.color}}>{s.label}</div><div style={{fontSize:10,color:C.gray,marginTop:1}}>{s.when}</div></div>
-                </div>
-              ))}
-            </Card>
-
-            <div style={slbl}>6-MONTH PROGRESSION</div>
-            {[
-              {phase:"Wks 1–3",  label:"Foundation",color:C.yellow,target:"172–174 lb",desc:"Learn gym movements — form over weight."},
-              {phase:"Wks 4–6",  label:"Build",     color:C.blue,  target:"170–172 lb",desc:"Add 5 lbs to main lifts when all reps clean."},
-              {phase:"Wks 7–10", label:"Momentum",  color:C.green, target:"167–170 lb",desc:"Back and glute changes becoming visible."},
-              {phase:"Wks 11–16",label:"Peak",      color:C.green, target:"163–167 lb",desc:"Progressive overload every lift."},
-              {phase:"Wks 17–22",label:"Refine",    color:C.purple,target:"160–164 lb",desc:"Shift toward recomposition. Keep protein high."},
-              {phase:"Wks 23–26",label:"Lock In",   color:C.red,   target:"160–165 lb ✅",desc:"Goal range. Focus on mirror + performance."},
-            ].map((p,i)=>(
-              <Card key={i} style={{padding:"10px 14px",marginBottom:7,display:"flex",gap:12,alignItems:"flex-start"}}>
-                <div style={{flexShrink:0,width:60}}><div style={{fontSize:10,color:p.color,fontWeight:700}}>{p.phase}</div><div style={{fontSize:8,color:C.dim}}>{p.label}</div></div>
-                <div style={{flex:1}}><div style={{fontSize:11,fontWeight:700,color:C.green,marginBottom:3}}>{p.target}</div><div style={{fontSize:10,color:C.gray,lineHeight:1.4}}>{p.desc}</div></div>
-              </Card>
-            ))}
           </div>
         )}
 
